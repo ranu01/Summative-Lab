@@ -60,8 +60,9 @@ class Inventory:
                 return True
         return False
 
-# Instantiate our class data container globally
+# Instantiate our class data container globally & attach to app for testing
 db = Inventory()
+app.inventory = db
 
 # ========================================================
 # TRANSPORT ROUTING LAYER: FLASK ENDPOINTS
@@ -123,7 +124,7 @@ def delete_item(item_id):
 
 @app.route("/search/<barcode>", methods=["GET"])
 def search_product(barcode):
-    url = f"https://openfoodfacts.org{barcode}.json"
+    url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
     headers = {"User-Agent": "StudentInventoryLab/1.0 (Flask REST API School Project)"}
     
     try:
@@ -147,10 +148,10 @@ def search_product(barcode):
 
 @app.route("/search/<barcode>/import", methods=["POST"])
 def import_product(barcode):
-    if any(item["barcode"] == str(barcode) for item in db.get_all_items()):
+    if any(str(item["barcode"]) == str(barcode) for item in db.get_all_items()):
         return jsonify({"error": "Product with this barcode already exists in inventory"}), 400
 
-    url = f"https://openfoodfacts.org{barcode}.json"
+    url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
     headers = {"User-Agent": "StudentInventoryLab/1.0 (Flask REST API School Project)"}
     
     try:
