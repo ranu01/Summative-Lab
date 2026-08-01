@@ -9,27 +9,18 @@ class InventoryAPITest(unittest.TestCase):
         self.client = app.test_client()
         self.client.testing = True
 
-        # Reset inventory before each test (important)
+        # Reset inventory before each test
         app.inventory.items = []
 
-    # =========================
-    # TEST HOME ROUTE
-    # =========================
     def test_home(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
 
-    # =========================
-    # TEST GET ALL ITEMS
-    # =========================
     def test_get_all_items(self):
         response = self.client.get("/items")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(json.loads(response.data), [])
 
-    # =========================
-    # TEST ADD ITEM
-    # =========================
     def test_add_item(self):
         item = {
             "id": 1,
@@ -47,9 +38,6 @@ class InventoryAPITest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 201)
 
-    # =========================
-    # TEST GET SINGLE ITEM
-    # =========================
     def test_get_single_item(self):
         self.client.post(
             "/items",
@@ -66,9 +54,6 @@ class InventoryAPITest(unittest.TestCase):
         response = self.client.get("/items/2")
         self.assertEqual(response.status_code, 200)
 
-    # =========================
-    # TEST UPDATE ITEM
-    # =========================
     def test_update_item(self):
         self.client.post(
             "/items",
@@ -90,9 +75,6 @@ class InventoryAPITest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
 
-    # =========================
-    # TEST DELETE ITEM
-    # =========================
     def test_delete_item(self):
         self.client.post(
             "/items",
@@ -109,13 +91,9 @@ class InventoryAPITest(unittest.TestCase):
         response = self.client.delete("/items/4")
         self.assertEqual(response.status_code, 200)
 
-    # =========================
-    # TEST EXTERNAL API ROUTE
-    # =========================
     def test_external_api_route(self):
-        # Using a known barcode (OpenFoodFacts sample)
         response = self.client.get("/search/737628064502")
-        self.assertIn(response.status_code, [200, 404, 500])  # API may vary
+        self.assertIn(response.status_code, [200, 404, 500])
 
 
 if __name__ == "__main__":
