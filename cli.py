@@ -78,7 +78,23 @@ def delete_item():
 def search_product():
     barcode = input("Enter barcode: ")
     response = requests.get(f"{BASE_URL}/search/{barcode}")
-    print(response.json())
+    if response.status_code != 200:
+        print(response.json())
+        return
+
+    product_info = response.json()
+    print("\n--- External Product Meta Located ---")
+    print(f"Barcode: {product_info.get('barcode')}")
+    print(f"Name:    {product_info.get('name')}")
+    print(f"Brand:   {product_info.get('brand')}")
+    print(f"Catalog: {product_info.get('category')}")
+
+    import_choice = input("\nWould you like to import this item to the database? (y/n): ").strip().lower()
+    if import_choice == 'y':
+        import_response = requests.post(f"{BASE_URL}/search/{barcode}/import")
+        print(import_response.json())
+    else:
+        print("Import sequence aborted.")
 
 
 def main():

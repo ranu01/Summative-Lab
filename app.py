@@ -3,9 +3,6 @@ import requests
 
 app = Flask(__name__)
 
-# ========================================================
-# BUSINESS LOGIC LAYER: INVENTORY STATE MANAGER
-# ========================================================
 class Inventory:
     """Handles CRUD operations in memory to isolate data layers."""
     def __init__(self):
@@ -60,13 +57,9 @@ class Inventory:
                 return True
         return False
 
-# Instantiate our class data container globally & attach to app for testing
 db = Inventory()
 app.inventory = db
 
-# ========================================================
-# TRANSPORT ROUTING LAYER: FLASK ENDPOINTS
-# ========================================================
 @app.route("/")
 def home():
     return jsonify({

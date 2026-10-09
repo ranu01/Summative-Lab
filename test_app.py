@@ -1,5 +1,6 @@
 import unittest
 import json
+from unittest.mock import patch
 from app import app
 
 
@@ -9,7 +10,6 @@ class InventoryAPITest(unittest.TestCase):
         self.client = app.test_client()
         self.client.testing = True
 
-        # Reset inventory before each test
         app.inventory.items = []
 
     def test_home(self):
@@ -94,6 +94,27 @@ class InventoryAPITest(unittest.TestCase):
     def test_external_api_route(self):
         response = self.client.get("/search/737628064502")
         self.assertIn(response.status_code, [200, 404, 500])
+
+    @patch("cli.requests.post")
+    @patch("cli.requests.get")
+    @patch("builtins.input", side_effect=["123456", "y"])
+    def test_search_product_import_prompt(self, mock_input, mock_get, mock_post):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {
+            "barcode": "123456",
+            "name": "Milk",
+            "brand": "Farm",
+            "category": "Dairy"
+        }
+        mock_post.return_value.json.return_value = {
+            "message": "Successfully auto-saved!",
+            "item": {"id": 10, "name": "Milk", "barcode": "123456", "quantity": 1, "price": 9.99}
+        }
+
+        from cli import search_product
+        search_product()
+
+        mock_post.assert_called_once_with("http://127.0.0.1:5000/search/123456/import")
 
 
 if __name__ == "__main__":
