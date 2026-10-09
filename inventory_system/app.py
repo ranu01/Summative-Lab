@@ -65,7 +65,7 @@ def home():
         "endpoints": [
             "GET /items", "GET /items/<id>", "POST /items",
             "PATCH /items/<id>", "DELETE /items/<id>",
-            "GET /search/<barcode>", "POST /search/<barcode>/import"
+            "GET /search?name=<product name>", "POST /search/<barcode>/import"
         ]
     })
 
@@ -106,32 +106,82 @@ def delete_item(item_id):
         return jsonify({"message": "Item deleted successfully"}), 200
     return jsonify({"error": "Item not found"}), 404
 
-@app.route("/search/<barcode>", methods=["GET"])
-def search_product(barcode):
-    url = f"https://openfoodfacts.org{barcode}.json"
+@app.route("/search", methods=["GET"])
+def search_product():
+    barcode = request.args.get("barcode", "").strip()
+    product_name = request.args.get("name", "").strip()
+
+    if barcode:
+        url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
+        headers = {"User-Agent": "StudentInventoryLab/1.0 (Flask REST API School Project)"}
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code != 200:
+                return jsonify({
+                    "error": "OpenFoodFacts barcode lookup failed",
+                    "upstream_status": response.status_code
+                }), 502
+
+            product_payload = response.json()
+            if product_payload.get("status") == 0:
+                return jsonify({"error": "No matching product found"}), 404
+
+            product = product_payload.get("product", {})
+            product_data = [{
+                "barcode": str(product.get("code") or barcode),
+                "name": product.get("product_name") or "Unknown Product",
+                "brand": product.get("brands") or "Generic Brand",
+                "category": product.get("categories") or "Uncategorized"
+            }]
+            return jsonify({"products": product_data}), 200
+        except (requests.exceptions.RequestException, ValueError):
+            return jsonify({"error": "Network pipeline error"}), 500
+
+    if not product_name:
+        return jsonify({"error": "Product name or barcode is required"}), 400
+
+    url = "https://world.openfoodfacts.org/api/v2/search"
     headers = {"User-Agent": "StudentInventoryLab/1.0 (Flask REST API School Project)"}
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(
+            url,
+            params={
+                "search_terms": product_name,
+                "fields": "code,product_name,brands,categories",
+                "page_size": 10
+            },
+            headers=headers,
+            timeout=10
+        )
         if response.status_code != 200:
-            return jsonify({"error": "Unable to contact OpenFoodFacts"}), 500
-        product = response.json()
-        if product.get("status") == 0:
-            return jsonify({"error": "Product not found"}), 404
-        product_data = product["product"]
-        return jsonify({
-            "barcode": barcode,
-            "name": product_data.get("product_name", "Unknown Product"),
-            "brand": product_data.get("brands", "Generic Brand"),
-            "category": product_data.get("categories", "Uncategorized")
-        }), 200
-    except requests.exceptions.RequestException:
+            return jsonify({
+                "error": "OpenFoodFacts search failed",
+                "upstream_status": response.status_code
+            }), 502
+
+        catalog_products = response.json().get("products", [])
+        products = [
+            {
+                "barcode": str(product["code"]),
+                "name": product.get("product_name") or "Unknown Product",
+                "brand": product.get("brands") or "Generic Brand",
+                "category": product.get("categories") or "Uncategorized"
+            }
+            for product in catalog_products
+            if product.get("code")
+        ]
+        if not products:
+            return jsonify({"error": "No matching products found"}), 404
+
+        return jsonify({"products": products}), 200
+    except (requests.exceptions.RequestException, ValueError):
         return jsonify({"error": "Network pipeline error"}), 500
 
 @app.route("/search/<barcode>/import", methods=["POST"])
 def import_product(barcode):
     if any(item["barcode"] == str(barcode) for item in db.get_all_items()):
         return jsonify({"error": "Product already exists"}), 400
-    url = f"https://openfoodfacts.org{barcode}.json"
+    url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
     headers = {"User-Agent": "StudentInventoryLab/1.0 (Flask REST API School Project)"}
     try:
         response = requests.get(url, headers=headers, timeout=10)

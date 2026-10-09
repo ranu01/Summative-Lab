@@ -2,6 +2,7 @@
 import unittest
 # Import JSON support to serialize request data and parse response payloads.
 import json
+from unittest.mock import patch
 # Import the Flask app instance from the main application module.
 from app import app
 
@@ -155,12 +156,42 @@ class InventoryAPITest(unittest.TestCase):
         # Confirm the delete endpoint returned success.
         self.assertEqual(response.status_code, 200)
 
-    # Verify the external barcode lookup route responds in a valid way.
-    def test_external_api_route(self):
-        # Query the external product route using a known barcode.
-        response = self.client.get("/search/737628064502")
-        # Accept common valid HTTP responses for a successful lookup or remote API failure.
-        self.assertIn(response.status_code, [200, 404, 500])
+    # Verify that the external product search accepts a product name.
+    @patch("app.requests.get")
+    def test_external_api_route(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {
+            "products": [{
+                "code": "737628064502",
+                "product_name": "Milk",
+                "brands": "Farm",
+                "categories": "Dairy"
+            }]
+        }
+
+        response = self.client.get("/search", query_string={"name": "Milk"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["products"][0]["barcode"], "737628064502")
+
+    @patch("app.requests.get")
+    def test_external_api_route_by_barcode(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {
+            "status": 1,
+            "product": {
+                "code": "6111266962187",
+                "product_name": "Lait frais naturel demi écrémé",
+                "brands": "Jaouda",
+                "categories": "Meals"
+            }
+        }
+
+        response = self.client.get("/search", query_string={"barcode": "6111266962187"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["products"][0]["barcode"], "6111266962187")
+        self.assertEqual(response.json["products"][0]["name"], "Lait frais naturel demi écrémé")
 
 
 # Run the test suite when this file is executed directly.

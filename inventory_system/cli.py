@@ -20,8 +20,8 @@ def show_menu():
     print("4. Update item fields")
     # Show option 5 for deleting an item record.
     print("5. Delete item tracking")
-    # Show option 6 for searching and importing by barcode.
-    print("6. Search & Import barcode (External API)")
+    # Show option 6 for searching products by name.
+    print("6. Search product by name (External API)")
     # Show option 0 for exiting the menu.
     print("0. Exit")
 
@@ -136,14 +136,22 @@ def delete_item():
         # Explain that the backend application is not available.
         print("Error: Backend Flask application is not running.")
 
-# Search a product by barcode and optionally import it.
+# Search products by name and optionally import one of the matches.
 def search_product():
-    # Ask the user for the barcode to lookup.
-    barcode = input("Enter barcode to lookup: ")
+    # Ask the user for the product name or barcode to search.
+    product_name = input("Enter product name or barcode: ").strip()
+    if not product_name:
+        print("Product name or barcode cannot be blank.")
+        return
+
     # Try to contact the backend search endpoint.
     try:
-        # Send the GET request for the barcode search.
-        response = requests.get(f"{BASE_URL}/search/{barcode}")
+        # If the input is numeric, treat it as a barcode lookup.
+        params = {"barcode": product_name} if product_name.isdigit() else {"name": product_name}
+        response = requests.get(
+            f"{BASE_URL}/search",
+            params=params
+        )
         # If the response is not successful, print the JSON error and stop.
         if response.status_code != 200:
             # Show the server error payload.
@@ -151,19 +159,30 @@ def search_product():
             # Return early so the function ends.
             return
 
-        # Parse the returned product info.
-        product_info = response.json()
-        # Print a heading for the external product details.
-        print("\n--- External Product Meta Located ---")
-        # Print the barcode from the result.
-        print(f"Barcode: {product_info.get('barcode')}")
-        # Print the product name.
-        print(f"Name:    {product_info.get('name')}")
-        # Print the product brand.
-        print(f"Brand:   {product_info.get('brand')}")
-        # Print the product category.
-        print(f"Catalog: {product_info.get('category')}")
-        
+        # Parse and display the matching products.
+        products = response.json().get("products", [])
+        if not products:
+            print("No matching products found.")
+            return
+
+        print("\n--- Matching Products ---")
+        for index, product in enumerate(products, start=1):
+            print(
+                f"{index}. {product.get('name')} | "
+                f"Brand: {product.get('brand')} | "
+                f"Category: {product.get('category')} | "
+                f"Barcode: {product.get('barcode')}"
+            )
+
+        selection = input("Choose a product number to import (0 to cancel): ").strip()
+        if selection == "0":
+            print("Import sequence aborted.")
+            return
+        if not selection.isdigit() or not 1 <= int(selection) <= len(products):
+            print("Invalid product selection.")
+            return
+
+        barcode = products[int(selection) - 1]["barcode"]
         # Ask the user if they want to import the item into the inventory.
         import_choice = input("\nWould you like to import this item to the database? (y/n): ").strip().lower()
         # If the user chooses yes, send the import request.
